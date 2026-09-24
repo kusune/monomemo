@@ -8,7 +8,7 @@ class HistoryRepeatIntervalTest {
     @Test
     fun sliderCoversRequestedBounds() {
         assertEquals(200L, HistoryRepeatInterval.fromSliderProgress(0))
-        assertEquals(10L, HistoryRepeatInterval.fromSliderProgress(HistoryRepeatInterval.SLIDER_STEPS))
+        assertEquals(1L, HistoryRepeatInterval.fromSliderProgress(HistoryRepeatInterval.SLIDER_STEPS))
     }
 
     @Test

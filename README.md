@@ -15,7 +15,7 @@ The current editor slice is intentionally small:
 - paste-at-cursor toolbar action
 - undo/redo for text edits, including branching after undo
 - long-press repeat for undo/redo toolbar actions
-- configurable undo/redo repeat interval (200ms to 10ms)
+- configurable undo/redo repeat interval (200ms to 1ms)
 - momentum scrolling for fast editor swipes
 - minimal menu and display settings entry points
 - software information in the main menu

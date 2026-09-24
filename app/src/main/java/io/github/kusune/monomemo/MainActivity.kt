@@ -21,6 +21,7 @@ import android.view.Gravity
 import android.view.MotionEvent
 import android.view.ScaleGestureDetector
 import android.view.View
+import android.view.ViewConfiguration
 import android.view.WindowManager
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
@@ -43,6 +44,8 @@ class MainActivity : Activity() {
     private lateinit var wrapButton: ImageButton
     private lateinit var scaleDetector: ScaleGestureDetector
     private val editHistory = EditHistory()
+    private val defaultHistoryRepeatIntervalMillis =
+        (ViewConfiguration.getKeyRepeatDelay().toLong() / 2L).coerceAtLeast(HistoryRepeatInterval.MIN_MILLIS)
 
     private var loading = true
     private var historyApplying = false
@@ -54,7 +57,7 @@ class MainActivity : Activity() {
         lineSpacingMultiplier = EditorPreferences.DEFAULT_LINE_SPACING,
         wrapLines = false,
     )
-    private var historyRepeatIntervalMillis = HistoryRepeatInterval.DEFAULT_MILLIS
+    private var historyRepeatIntervalMillis = defaultHistoryRepeatIntervalMillis
 
     private val saveRunnable = Runnable { saveNow() }
     private val historyRepeatRunnable = object : Runnable {
@@ -75,7 +78,9 @@ class MainActivity : Activity() {
         store = LocalNoteStore(this)
         editorPreferences = EditorPreferences(this)
         displaySettings = editorPreferences.load()
-        historyRepeatIntervalMillis = editorPreferences.loadHistoryRepeatIntervalMillis()
+        historyRepeatIntervalMillis = editorPreferences.loadHistoryRepeatIntervalMillis(
+            defaultHistoryRepeatIntervalMillis,
+        )
         scaleDetector = createScaleDetector()
         editor = createEditor()
 

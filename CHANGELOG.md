@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.3
+
+- Base the default undo/redo repeat interval on Android's key-repeat delay,
+  at approximately twice that speed.
+- Extend the logarithmic undo/redo interval slider from 200ms down to 1ms.
+- Keep the Android long-press threshold independent from the repeat interval.
+- Avoid forcing the keyboard visible again after the user dismisses it.
+
 ## 0.4.2
 
 - Add a logarithmic slider for the undo/redo long-press interval (200ms to

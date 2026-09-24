@@ -14,9 +14,9 @@ data class DisplaySettings(
 
 /** Logarithmic slider mapping for the undo/redo repeat interval. */
 object HistoryRepeatInterval {
-    const val MIN_MILLIS = 10L
+    const val MIN_MILLIS = 1L
     const val MAX_MILLIS = 200L
-    const val DEFAULT_MILLIS = 50L
+    const val DEFAULT_MILLIS = 25L
     const val SLIDER_STEPS = 100
 
     fun clamp(intervalMillis: Long): Long = intervalMillis.coerceIn(MIN_MILLIS, MAX_MILLIS)
@@ -55,20 +55,24 @@ class EditorPreferences(context: Context) {
             .apply()
     }
 
-    fun loadHistoryRepeatIntervalMillis(): Long {
-        val storedInterval = if (preferences.contains(KEY_HISTORY_REPEAT_INTERVAL_MILLIS)) {
-            preferences.getLong(
+    fun loadHistoryRepeatIntervalMillis(
+        defaultIntervalMillis: Long = HistoryRepeatInterval.DEFAULT_MILLIS,
+    ): Long {
+        val storedInterval = when {
+            preferences.contains(KEY_HISTORY_REPEAT_INTERVAL_MILLIS) -> preferences.getLong(
                 KEY_HISTORY_REPEAT_INTERVAL_MILLIS,
-                HistoryRepeatInterval.DEFAULT_MILLIS,
+                defaultIntervalMillis,
             )
-        } else {
-            // Migrate the short-lived 1x/2x/4x preference format.
-            when (preferences.getInt(KEY_LEGACY_HISTORY_REPEAT_SPEED, 2)) {
-                1 -> 100L
-                2 -> 50L
-                4 -> 25L
-                else -> HistoryRepeatInterval.DEFAULT_MILLIS
+            preferences.contains(KEY_LEGACY_HISTORY_REPEAT_SPEED) -> {
+                // Migrate the short-lived 1x/2x/4x preference format.
+                when (preferences.getInt(KEY_LEGACY_HISTORY_REPEAT_SPEED, 2)) {
+                    1 -> 100L
+                    2 -> 50L
+                    4 -> 25L
+                    else -> defaultIntervalMillis
+                }
             }
+            else -> defaultIntervalMillis
         }
         return HistoryRepeatInterval.clamp(storedInterval)
     }

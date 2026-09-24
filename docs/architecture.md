@@ -24,8 +24,10 @@ session; the history is intentionally not persisted as part of the note file.
 The toolbar undo and redo buttons also repeat their action while held, using
 the platform long-press threshold. Repeating stops when the button is released
 or the corresponding history side is empty. The repeat interval can be
-selected in the settings dialog from 200 ms to 10 ms using a logarithmic
-slider; the default is 50 ms.
+selected in the settings dialog from 200 ms to 1 ms using a logarithmic
+slider. The default is half of Android's standard key-repeat delay (typically
+25 ms). The long-press threshold remains the platform threshold and is
+independent of this interval.
 
 `CursorAwareEditText` adds an `OverScroller`-based fling after a single-pointer
 scroll gesture. Selection drags and pinch gestures are excluded, so momentum
