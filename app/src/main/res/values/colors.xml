@@ -1,0 +1,6 @@
+<resources>
+    <color name="editor_background">#101410</color>
+    <color name="editor_text">#A8F58A</color>
+    <color name="editor_hint">#5C7D52</color>
+    <color name="accent">#73D65C</color>
+</resources>
