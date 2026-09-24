@@ -1,15 +1,20 @@
 package io.github.kusune.monomemo
 
+import android.annotation.SuppressLint
 import android.app.Activity
 import android.app.AlertDialog
+import android.content.ClipboardManager
 import android.content.Context
 import android.content.res.ColorStateList
 import android.graphics.Color
+import android.graphics.text.LineBreakConfig
 import android.os.Bundle
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.text.Editable
 import android.text.InputType
+import android.text.Layout
 import android.text.TextWatcher
 import android.util.TypedValue
 import android.view.Gravity
@@ -37,7 +42,7 @@ class MainActivity : Activity() {
 
     private var loading = true
     private var displaySettings = DisplaySettings(
-        fontSizeSp = EditorPreferences.DEFAULT_FONT_SIZE_SP,
+        fontSizePt = EditorPreferences.DEFAULT_FONT_SIZE_PT,
         lineSpacingMultiplier = EditorPreferences.DEFAULT_LINE_SPACING,
         wrapLines = false,
     )
@@ -95,6 +100,7 @@ class MainActivity : Activity() {
         isSingleLine = false
         setHorizontalScrollBarEnabled(false)
         setVerticalScrollBarEnabled(true)
+        configureCharacterWrapping()
         setOnTouchListener { _, event ->
             scaleDetector.onTouchEvent(event)
             false
@@ -132,6 +138,10 @@ class MainActivity : Activity() {
             setPadding(dp(8), 0, dp(8), 0)
         }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f))
 
+        val pasteButton = createActionButton(R.drawable.ic_paste, "カーソル位置に貼り付け")
+        pasteButton.setOnClickListener { pasteAtCursor() }
+        addView(pasteButton)
+
         wrapButton = createActionButton(R.drawable.ic_no_wrap, "折り返し切替")
         wrapButton.setOnClickListener { toggleWrapLines() }
         addView(wrapButton)
@@ -154,7 +164,7 @@ class MainActivity : Activity() {
         this,
         object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
             override fun onScale(detector: ScaleGestureDetector): Boolean {
-                val nextSize = displaySettings.fontSizeSp * detector.scaleFactor
+                val nextSize = displaySettings.fontSizePt * detector.scaleFactor
                 updateFontSize(nextSize)
                 return true
             }
@@ -162,9 +172,12 @@ class MainActivity : Activity() {
     )
 
     private fun applyDisplaySettings() {
-        editor.setTextSize(TypedValue.COMPLEX_UNIT_SP, displaySettings.fontSizeSp)
+        // Android's physical PT unit becomes unexpectedly large on high-density
+        // phones. This logical editor scale keeps 12pt close to 16sp.
+        editor.setTextSize(TypedValue.COMPLEX_UNIT_SP, displaySettings.fontSizePt * 4f / 3f)
         editor.setLineSpacing(0f, displaySettings.lineSpacingMultiplier)
         editor.setHorizontallyScrolling(!displaySettings.wrapLines)
+        editor.requestLayout()
         wrapButton.setImageResource(
             if (displaySettings.wrapLines) R.drawable.ic_wrap else R.drawable.ic_no_wrap,
         )
@@ -176,11 +189,11 @@ class MainActivity : Activity() {
     }
 
     private fun updateFontSize(value: Float) {
-        val next = (value * 10f).roundToInt() / 10f
+        val next = (value * 2f).roundToInt() / 2f
         displaySettings = displaySettings.copy(
-            fontSizeSp = next.coerceIn(
-                EditorPreferences.MIN_FONT_SIZE_SP,
-                EditorPreferences.MAX_FONT_SIZE_SP,
+            fontSizePt = next.coerceIn(
+                EditorPreferences.MIN_FONT_SIZE_PT,
+                EditorPreferences.MAX_FONT_SIZE_PT,
             ),
         )
         editorPreferences.save(displaySettings)
@@ -215,11 +228,16 @@ class MainActivity : Activity() {
                     toggleWrapLines()
                     true
                 }
+            menu.add("ソフトウェア情報").setOnMenuItemClickListener {
+                showSoftwareInfo()
+                true
+            }
             show()
         }
     }
 
     private fun showDisplaySettings() {
+        var draftSettings = displaySettings
         val container = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(24), dp(4), dp(24), 0)
@@ -229,46 +247,48 @@ class MainActivity : Activity() {
             setTextColor(Color.WHITE)
         }
         val fontSizeSeekBar = SeekBar(this).apply {
-            max = ((EditorPreferences.MAX_FONT_SIZE_SP - EditorPreferences.MIN_FONT_SIZE_SP) * 10).roundToInt()
-            progress = ((displaySettings.fontSizeSp - EditorPreferences.MIN_FONT_SIZE_SP) * 10).roundToInt()
+            max = ((EditorPreferences.MAX_FONT_SIZE_PT - EditorPreferences.MIN_FONT_SIZE_PT) * 2).roundToInt()
+            progress = ((draftSettings.fontSizePt - EditorPreferences.MIN_FONT_SIZE_PT) * 2).roundToInt()
             setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
                 override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
-                    updateFontSize(EditorPreferences.MIN_FONT_SIZE_SP + progress / 10f)
-                    fontSizeLabel.text = "文字サイズ  %.1fsp".format(displaySettings.fontSizeSp)
+                    draftSettings = draftSettings.copy(
+                        fontSizePt = EditorPreferences.MIN_FONT_SIZE_PT + progress / 2f,
+                    )
+                    fontSizeLabel.text = "文字サイズ  %.1fpt".format(draftSettings.fontSizePt)
                 }
 
                 override fun onStartTrackingTouch(seekBar: SeekBar?) = Unit
                 override fun onStopTrackingTouch(seekBar: SeekBar?) = Unit
             })
         }
-        fontSizeLabel.text = "文字サイズ  %.1fsp".format(displaySettings.fontSizeSp)
+        fontSizeLabel.text = "文字サイズ  %.1fpt".format(draftSettings.fontSizePt)
 
         val lineSpacingLabel = TextView(this).apply {
             setTextColor(Color.WHITE)
         }
         val lineSpacingSeekBar = SeekBar(this).apply {
             max = ((EditorPreferences.MAX_LINE_SPACING - EditorPreferences.MIN_LINE_SPACING) * 20).roundToInt()
-            progress = ((displaySettings.lineSpacingMultiplier - EditorPreferences.MIN_LINE_SPACING) * 20).roundToInt()
+            progress = ((draftSettings.lineSpacingMultiplier - EditorPreferences.MIN_LINE_SPACING) * 20).roundToInt()
             setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
                 override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
-                    updateLineSpacing(EditorPreferences.MIN_LINE_SPACING + progress / 20f)
-                    lineSpacingLabel.text = "行間  %.0f%%".format(displaySettings.lineSpacingMultiplier * 100f)
+                    draftSettings = draftSettings.copy(
+                        lineSpacingMultiplier = EditorPreferences.MIN_LINE_SPACING + progress / 20f,
+                    )
+                    lineSpacingLabel.text = "行間  %.0f%%".format(draftSettings.lineSpacingMultiplier * 100f)
                 }
 
                 override fun onStartTrackingTouch(seekBar: SeekBar?) = Unit
                 override fun onStopTrackingTouch(seekBar: SeekBar?) = Unit
             })
         }
-        lineSpacingLabel.text = "行間  %.0f%%".format(displaySettings.lineSpacingMultiplier * 100f)
+        lineSpacingLabel.text = "行間  %.0f%%".format(draftSettings.lineSpacingMultiplier * 100f)
 
         val wrapSwitch = Switch(this).apply {
             text = "画面端で折り返す"
             setTextColor(Color.WHITE)
-            isChecked = displaySettings.wrapLines
+            isChecked = draftSettings.wrapLines
             setOnCheckedChangeListener { _, checked ->
-                if (displaySettings.wrapLines != checked) {
-                    toggleWrapLines()
-                }
+                draftSettings = draftSettings.copy(wrapLines = checked)
             }
         }
 
@@ -278,9 +298,61 @@ class MainActivity : Activity() {
         container.addView(lineSpacingSeekBar)
         container.addView(wrapSwitch)
 
-        AlertDialog.Builder(this)
+        val dialog = AlertDialog.Builder(this)
             .setTitle("表示設定")
             .setView(container)
+            .setNegativeButton("キャンセル", null)
+            .setPositiveButton("決定", null)
+            .create()
+        dialog.setOnShowListener {
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                displaySettings = draftSettings
+                editorPreferences.save(displaySettings)
+                applyDisplaySettings()
+                dialog.dismiss()
+            }
+        }
+        dialog.show()
+    }
+
+    @SuppressLint("WrongConstant")
+    private fun configureCharacterWrapping() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            editor.breakStrategy = Layout.BREAK_STRATEGY_SIMPLE
+            editor.hyphenationFrequency = Layout.HYPHENATION_FREQUENCY_NONE
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
+            // Avoid dictionary/phrase-based wrapping when the platform supports
+            // explicit line-break configuration.
+            editor.setLineBreakStyle(LineBreakConfig.LINE_BREAK_STYLE_NONE)
+            editor.setLineBreakWordStyle(LineBreakConfig.LINE_BREAK_WORD_STYLE_NONE)
+        }
+    }
+
+    private fun pasteAtCursor() {
+        val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        val clip = clipboard.primaryClip ?: return
+        if (clip.itemCount == 0) return
+        val pasted = clip.getItemAt(0).coerceToText(this)
+        if (pasted.isNullOrEmpty()) return
+
+        // Use the caret's end position and do not replace a selected range.
+        val insertionPoint = editor.selectionEnd.coerceIn(0, editor.text.length)
+        editor.text.insert(insertionPoint, pasted)
+        editor.setSelection(insertionPoint + pasted.length)
+        editor.requestFocus()
+        scheduleSave()
+    }
+
+    private fun showSoftwareInfo() {
+        AlertDialog.Builder(this)
+            .setTitle("ソフトウェア情報")
+            .setMessage(
+                "MonoMemo ${BuildConfig.VERSION_NAME}\n\n" +
+                    "GNU General Public License v3.0\n" +
+                    "Bundled font: BIZ UDGothic (SIL Open Font License 1.1)\n\n" +
+                    "https://github.com/kusune/monomemo",
+            )
             .setPositiveButton("閉じる", null)
             .show()
     }

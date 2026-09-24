@@ -3,6 +3,16 @@ plugins {
     id("org.jetbrains.kotlin.android")
 }
 
+val releaseKeystorePath = System.getenv("MONOMEMO_KEYSTORE_PATH")?.takeIf { it.isNotBlank() }
+val releaseStorePassword = System.getenv("MONOMEMO_KEYSTORE_PASSWORD")?.takeIf { it.isNotBlank() }
+val releaseKeyAlias = System.getenv("MONOMEMO_KEY_ALIAS")?.takeIf { it.isNotBlank() }
+    ?: "monomemo-release"
+val releaseKeyPassword = System.getenv("MONOMEMO_KEY_PASSWORD")?.takeIf { it.isNotBlank() }
+    ?: releaseStorePassword
+val releaseSigningConfigured = releaseKeystorePath != null &&
+    releaseStorePassword != null &&
+    releaseKeyPassword != null
+
 android {
     namespace = "io.github.kusune.monomemo"
     compileSdk = 35
@@ -11,14 +21,32 @@ android {
         applicationId = "io.github.kusune.monomemo"
         minSdk = 26
         targetSdk = 35
-        versionCode = 2
-        versionName = "0.2.0"
+        versionCode = 3
+        versionName = "0.3.0"
+    }
+
+    signingConfigs {
+        if (releaseSigningConfigured) {
+            create("monomemoRelease") {
+                storeFile = file(requireNotNull(releaseKeystorePath))
+                storePassword = requireNotNull(releaseStorePassword)
+                keyAlias = releaseKeyAlias
+                keyPassword = requireNotNull(releaseKeyPassword)
+            }
+        }
     }
 
     buildTypes {
         release {
             isMinifyEnabled = false
+            if (releaseSigningConfigured) {
+                signingConfig = signingConfigs.getByName("monomemoRelease")
+            }
         }
+    }
+
+    buildFeatures {
+        buildConfig = true
     }
 
     compileOptions {

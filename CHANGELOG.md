@@ -13,3 +13,11 @@
 - Add pinch font-size adjustment.
 - Add configurable line spacing.
 - Add visual line-wrapping toggle without changing the document text.
+
+## 0.3.0
+
+- Prefer character-oriented visual wrapping instead of dictionary wrapping.
+- Add a toolbar action that pastes at the caret without replacing a selection.
+- Display font-size controls in logical points (`pt`).
+- Apply display-dialog changes only after pressing `決定`; `キャンセル` leaves them unchanged.
+- Add software and license information to the hamburger menu.

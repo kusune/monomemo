@@ -9,6 +9,11 @@ The first version intentionally has only two application classes:
 - `LocalNoteStore`: the local note file and editor-state persistence.
 - `EditorPreferences`: app-level font size, line spacing, and wrapping state.
 
+Display settings edited from the dialog use a draft value and are committed
+only by the positive action. Pinch zoom and the toolbar wrap action remain
+direct actions. The paste toolbar action inserts clipboard text at the caret's
+end position without deleting a selected range.
+
 The editor is local-first. There is no cloud or multi-provider abstraction yet;
 those should be introduced only when pCloud synchronization is implemented.
 
