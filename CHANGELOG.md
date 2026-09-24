@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Add an Android emulator smoke test that launches the main activity before a
+  release is published.
+
 ## 0.1.0
 
 - Initial local-first editor slice.

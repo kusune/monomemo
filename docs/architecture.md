@@ -27,3 +27,9 @@ adapter and a small synchronization worker.
 Toolbar actions are fixed for now. The action buttons are created through a
 small common helper, but there is intentionally no configurable action system
 until there are enough actions to justify one.
+
+The `androidTest` source set contains a device-level startup smoke test. It
+does not attempt to verify every editing interaction, but it launches
+`MainActivity` on an emulator and verifies that the editor view is present.
+Both the normal CI workflow and the tagged-release workflow run this test
+before publishing an APK.

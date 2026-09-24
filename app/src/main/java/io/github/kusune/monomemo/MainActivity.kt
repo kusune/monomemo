@@ -85,6 +85,7 @@ class MainActivity : Activity() {
     }
 
     private fun createEditor(): CursorAwareEditText = CursorAwareEditText(this).apply {
+        id = R.id.editor
         setBackgroundColor(getColor(R.color.editor_background))
         setTextColor(getColor(R.color.editor_text))
         setHintTextColor(getColor(R.color.editor_hint))

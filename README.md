@@ -33,3 +33,10 @@ Open the project in Android Studio or run:
 ```
 
 The debug APK is written to `app/build/outputs/apk/debug/app-debug.apk`.
+
+With an Android emulator available, the device-level startup smoke test can be
+run with:
+
+```bash
+./gradlew connectedDebugAndroidTest
+```

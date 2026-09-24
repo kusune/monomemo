@@ -1,0 +1,50 @@
+name: Android checks
+
+on:
+    push:
+        branches:
+            - main
+    pull_request:
+        branches:
+            - main
+
+permissions:
+    contents: read
+
+jobs:
+    android-test:
+        runs-on: ubuntu-latest
+
+        steps:
+            - name: Check out source
+              uses: actions/checkout@v5
+
+            - name: Set up Java
+              uses: actions/setup-java@v5
+              with:
+                  distribution: temurin
+                  java-version: "17"
+
+            - name: Set up Android SDK
+              uses: android-actions/setup-android@v3
+              with:
+                  packages: ''
+
+            - name: Install Android SDK packages
+              run: |
+                  yes | sdkmanager --licenses >/dev/null || true
+                  sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+
+            - name: Run Android smoke tests
+              uses: reactivecircus/android-emulator-runner@v2
+              with:
+                  api-level: 35
+                  target: google_apis
+                  arch: x86_64
+                  profile: Pixel_2
+                  force-avd-creation: true
+                  emulator-options: -no-window -no-audio -no-boot-anim
+                  disable-animations: true
+                  script: |
+                      chmod +x ./gradlew
+                      ./gradlew connectedDebugAndroidTest --stacktrace

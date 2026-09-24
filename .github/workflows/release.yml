@@ -32,6 +32,20 @@ jobs:
                   yes | sdkmanager --licenses >/dev/null || true
                   sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
 
+            - name: Run Android smoke tests
+              uses: reactivecircus/android-emulator-runner@v2
+              with:
+                  api-level: 35
+                  target: google_apis
+                  arch: x86_64
+                  profile: Pixel_2
+                  force-avd-creation: true
+                  emulator-options: -no-window -no-audio -no-boot-anim
+                  disable-animations: true
+                  script: |
+                      chmod +x ./gradlew
+                      ./gradlew connectedDebugAndroidTest --stacktrace
+
             - name: Prepare release signing key
               env:
                   KEYSTORE_BASE64: ${{ secrets.MONOMEMO_KEYSTORE_BASE64 }}
