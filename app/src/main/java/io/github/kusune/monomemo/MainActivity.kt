@@ -316,16 +316,16 @@ class MainActivity : Activity() {
     }
 
     @SuppressLint("WrongConstant")
-    private fun configureCharacterWrapping() {
+    private fun CursorAwareEditText.configureCharacterWrapping() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            editor.breakStrategy = Layout.BREAK_STRATEGY_SIMPLE
-            editor.hyphenationFrequency = Layout.HYPHENATION_FREQUENCY_NONE
+            breakStrategy = Layout.BREAK_STRATEGY_SIMPLE
+            hyphenationFrequency = Layout.HYPHENATION_FREQUENCY_NONE
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
             // Avoid dictionary/phrase-based wrapping when the platform supports
             // explicit line-break configuration.
-            editor.setLineBreakStyle(LineBreakConfig.LINE_BREAK_STYLE_NONE)
-            editor.setLineBreakWordStyle(LineBreakConfig.LINE_BREAK_WORD_STYLE_NONE)
+            setLineBreakStyle(LineBreakConfig.LINE_BREAK_STYLE_NONE)
+            setLineBreakWordStyle(LineBreakConfig.LINE_BREAK_WORD_STYLE_NONE)
         }
     }
 

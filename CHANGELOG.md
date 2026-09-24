@@ -21,3 +21,7 @@
 - Display font-size controls in logical points (`pt`).
 - Apply display-dialog changes only after pressing `決定`; `キャンセル` leaves them unchanged.
 - Add software and license information to the hamburger menu.
+
+## 0.3.1
+
+- Fix a startup crash introduced by the character-wrapping initialization.
