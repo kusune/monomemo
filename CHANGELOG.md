@@ -6,3 +6,10 @@
 - Bundled Japanese-capable fixed-width BIZ UDGothic font.
 - Autosaves after a short editing pause.
 - Restores selection and scroll position on launch.
+
+## 0.2.0
+
+- Add the editor toolbar and display settings foundation.
+- Add pinch font-size adjustment.
+- Add configurable line spacing.
+- Add visual line-wrapping toggle without changing the document text.

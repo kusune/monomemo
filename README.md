@@ -4,10 +4,14 @@ A minimal monospace text editor for Android with local-first cloud sync.
 
 ## Current status
 
-The first vertical slice is intentionally small:
+The current editor slice is intentionally small:
 
 - Japanese-capable editor surface
 - fixed line spacing
+- pinch font-size adjustment
+- configurable line spacing
+- visual line wrapping toggle
+- minimal menu and display settings entry points
 - local autosave after editing pauses
 - cursor and scroll position restoration
 
