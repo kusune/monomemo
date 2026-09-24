@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.1
+
+- Repeat undo/redo while the corresponding toolbar button is held.
+
 ## 0.4.0
 
 - Add an Android emulator smoke test that launches the main activity before a

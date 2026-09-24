@@ -21,6 +21,9 @@ current activity session. It keeps up to 1,000 edits, supports undo/redo, and
 discards the redo branch when a new edit is made after undo. The initial note
 loaded when the activity starts is therefore the first undo boundary for that
 session; the history is intentionally not persisted as part of the note file.
+The toolbar undo and redo buttons also repeat their action while held, using
+the platform long-press threshold and a fixed 100 ms repeat interval. Repeating
+stops when the button is released or the corresponding history side is empty.
 
 The editor is local-first. There is no cloud or multi-provider abstraction yet;
 those should be introduced only when pCloud synchronization is implemented.

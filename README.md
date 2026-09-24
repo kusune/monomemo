@@ -14,6 +14,7 @@ The current editor slice is intentionally small:
 - character-oriented visual wrapping
 - paste-at-cursor toolbar action
 - undo/redo for text edits, including branching after undo
+- long-press repeat for undo/redo toolbar actions
 - minimal menu and display settings entry points
 - software information in the main menu
 - local autosave after editing pauses

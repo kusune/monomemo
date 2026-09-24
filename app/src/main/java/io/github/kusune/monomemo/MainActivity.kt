@@ -18,6 +18,7 @@ import android.text.Layout
 import android.text.TextWatcher
 import android.util.TypedValue
 import android.view.Gravity
+import android.view.MotionEvent
 import android.view.ScaleGestureDetector
 import android.view.View
 import android.view.WindowManager
@@ -47,6 +48,7 @@ class MainActivity : Activity() {
     private var historyApplying = false
     private var pendingTextChange: PendingTextChange? = null
     private var nextSelectionAfterTextChange: Selection? = null
+    private var historyRepeatAction: (() -> Boolean)? = null
     private var displaySettings = DisplaySettings(
         fontSizePt = EditorPreferences.DEFAULT_FONT_SIZE_PT,
         lineSpacingMultiplier = EditorPreferences.DEFAULT_LINE_SPACING,
@@ -54,6 +56,16 @@ class MainActivity : Activity() {
     )
 
     private val saveRunnable = Runnable { saveNow() }
+    private val historyRepeatRunnable = object : Runnable {
+        override fun run() {
+            val action = historyRepeatAction ?: return
+            if (!action()) {
+                stopHistoryRepeat()
+                return
+            }
+            mainHandler.postDelayed(this, HISTORY_REPEAT_INTERVAL_MS)
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -74,12 +86,14 @@ class MainActivity : Activity() {
     }
 
     override fun onPause() {
+        stopHistoryRepeat()
         saveNow()
         super.onPause()
     }
 
     override fun onDestroy() {
         mainHandler.removeCallbacks(saveRunnable)
+        stopHistoryRepeat()
         super.onDestroy()
     }
 
@@ -151,12 +165,12 @@ class MainActivity : Activity() {
         pasteButton.setOnClickListener { pasteAtCursor() }
         addView(pasteButton)
 
-        undoButton = createActionButton(R.drawable.ic_undo, "元に戻す")
-        undoButton.setOnClickListener { undo() }
+        undoButton = createActionButton(R.drawable.ic_undo, "元に戻す（長押しで連続）")
+        configureHistoryButton(undoButton, ::undo)
         addView(undoButton)
 
-        redoButton = createActionButton(R.drawable.ic_redo, "やり直す")
-        redoButton.setOnClickListener { redo() }
+        redoButton = createActionButton(R.drawable.ic_redo, "やり直す（長押しで連続）")
+        configureHistoryButton(redoButton, ::redo)
         addView(redoButton)
 
         wrapButton = createActionButton(R.drawable.ic_no_wrap, "折り返し切替")
@@ -399,14 +413,47 @@ class MainActivity : Activity() {
         scheduleSave()
     }
 
-    private fun undo() {
-        val target = editHistory.undo(currentEditorState()) ?: return
+    private fun undo(): Boolean {
+        val target = editHistory.undo(currentEditorState()) ?: return false
         applyHistoryState(target)
+        return true
     }
 
-    private fun redo() {
-        val target = editHistory.redo(currentEditorState()) ?: return
+    private fun redo(): Boolean {
+        val target = editHistory.redo(currentEditorState()) ?: return false
         applyHistoryState(target)
+        return true
+    }
+
+    private fun configureHistoryButton(button: ImageButton, action: () -> Boolean) {
+        button.setOnClickListener { action() }
+        button.setOnLongClickListener {
+            startHistoryRepeat(action)
+            true
+        }
+        button.setOnTouchListener { _, event ->
+            if (event.actionMasked == MotionEvent.ACTION_UP ||
+                event.actionMasked == MotionEvent.ACTION_CANCEL
+            ) {
+                stopHistoryRepeat()
+            }
+            false
+        }
+    }
+
+    private fun startHistoryRepeat(action: () -> Boolean) {
+        stopHistoryRepeat()
+        historyRepeatAction = action
+        if (!action()) {
+            stopHistoryRepeat()
+            return
+        }
+        mainHandler.postDelayed(historyRepeatRunnable, HISTORY_REPEAT_INTERVAL_MS)
+    }
+
+    private fun stopHistoryRepeat() {
+        historyRepeatAction = null
+        mainHandler.removeCallbacks(historyRepeatRunnable)
     }
 
     private fun currentEditorState(): EditorState = EditorState(
@@ -565,5 +612,6 @@ class MainActivity : Activity() {
     companion object {
         private const val DISABLED_BUTTON_ALPHA = 0.35f
         private const val AUTOSAVE_DELAY_MS = 800L
+        private const val HISTORY_REPEAT_INTERVAL_MS = 100L
     }
 }
