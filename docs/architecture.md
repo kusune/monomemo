@@ -7,7 +7,7 @@ The first version intentionally has only two application classes:
 - `MainActivity`: editor view, toolbar, display controls, lifecycle, and
   debounced save scheduling.
 - `LocalNoteStore`: the local note file and editor-state persistence.
-- `EditorPreferences`: app-level font size, line spacing, and wrapping state.
+- `EditorPreferences`: app-level display settings and undo/redo repeat interval.
 
 Display settings edited from the dialog use a draft value that is applied to
 the editor immediately. The positive action persists the draft; dismissing the
@@ -23,9 +23,9 @@ loaded when the activity starts is therefore the first undo boundary for that
 session; the history is intentionally not persisted as part of the note file.
 The toolbar undo and redo buttons also repeat their action while held, using
 the platform long-press threshold. Repeating stops when the button is released
-or the corresponding history side is empty. The repeat speed can be selected
-in the settings dialog as 1x, 2x, or 4x; the default is 2x (50 ms between
-actions).
+or the corresponding history side is empty. The repeat interval can be
+selected in the settings dialog from 200 ms to 10 ms using a logarithmic
+slider; the default is 50 ms.
 
 `CursorAwareEditText` adds an `OverScroller`-based fling after a single-pointer
 scroll gesture. Selection drags and pinch gestures are excluded, so momentum

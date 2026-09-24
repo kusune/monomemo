@@ -2,7 +2,8 @@
 
 ## 0.4.2
 
-- Add configurable undo/redo long-press speed (1x, 2x, or 4x).
+- Add a logarithmic slider for the undo/redo long-press interval (200ms to
+  10ms), initially set to 50ms.
 - Avoid forcing the keyboard visible again after the user dismisses it.
 
 ## 0.4.1

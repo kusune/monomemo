@@ -1,6 +1,10 @@
 package io.github.kusune.monomemo
 
 import android.content.Context
+import kotlin.math.exp
+import kotlin.math.ln
+import kotlin.math.roundToInt
+import kotlin.math.roundToLong
 
 data class DisplaySettings(
     val fontSizePt: Float,
@@ -8,19 +12,27 @@ data class DisplaySettings(
     val wrapLines: Boolean,
 )
 
-enum class HistoryRepeatSpeed(
-    val multiplier: Int,
-    val intervalMillis: Long,
-) {
-    NORMAL(1, 100L),
-    DOUBLE(2, 50L),
-    QUADRUPLE(4, 25L),
-    ;
+/** Logarithmic slider mapping for the undo/redo repeat interval. */
+object HistoryRepeatInterval {
+    const val MIN_MILLIS = 10L
+    const val MAX_MILLIS = 200L
+    const val DEFAULT_MILLIS = 50L
+    const val SLIDER_STEPS = 100
 
-    companion object {
-        fun fromMultiplier(multiplier: Int): HistoryRepeatSpeed = values().firstOrNull {
-            it.multiplier == multiplier
-        } ?: EditorPreferences.DEFAULT_HISTORY_REPEAT_SPEED
+    fun clamp(intervalMillis: Long): Long = intervalMillis.coerceIn(MIN_MILLIS, MAX_MILLIS)
+
+    fun fromSliderProgress(progress: Int): Long {
+        val normalized = progress.coerceIn(0, SLIDER_STEPS).toDouble() / SLIDER_STEPS
+        val interval = MAX_MILLIS * exp(
+            ln(MIN_MILLIS.toDouble() / MAX_MILLIS) * normalized,
+        )
+        return interval.roundToLong().coerceIn(MIN_MILLIS, MAX_MILLIS)
+    }
+
+    fun toSliderProgress(intervalMillis: Long): Int {
+        val clamped = clamp(intervalMillis).toDouble()
+        val normalized = ln(MAX_MILLIS / clamped) / ln(MAX_MILLIS.toDouble() / MIN_MILLIS)
+        return (normalized * SLIDER_STEPS).roundToInt().coerceIn(0, SLIDER_STEPS)
     }
 }
 
@@ -43,16 +55,30 @@ class EditorPreferences(context: Context) {
             .apply()
     }
 
-    fun loadHistoryRepeatSpeed(): HistoryRepeatSpeed = HistoryRepeatSpeed.fromMultiplier(
-        preferences.getInt(
-            KEY_HISTORY_REPEAT_SPEED,
-            DEFAULT_HISTORY_REPEAT_SPEED.multiplier,
-        ),
-    )
+    fun loadHistoryRepeatIntervalMillis(): Long {
+        val storedInterval = if (preferences.contains(KEY_HISTORY_REPEAT_INTERVAL_MILLIS)) {
+            preferences.getLong(
+                KEY_HISTORY_REPEAT_INTERVAL_MILLIS,
+                HistoryRepeatInterval.DEFAULT_MILLIS,
+            )
+        } else {
+            // Migrate the short-lived 1x/2x/4x preference format.
+            when (preferences.getInt(KEY_LEGACY_HISTORY_REPEAT_SPEED, 2)) {
+                1 -> 100L
+                2 -> 50L
+                4 -> 25L
+                else -> HistoryRepeatInterval.DEFAULT_MILLIS
+            }
+        }
+        return HistoryRepeatInterval.clamp(storedInterval)
+    }
 
-    fun saveHistoryRepeatSpeed(speed: HistoryRepeatSpeed) {
+    fun saveHistoryRepeatIntervalMillis(intervalMillis: Long) {
         preferences.edit()
-            .putInt(KEY_HISTORY_REPEAT_SPEED, speed.multiplier)
+            .putLong(
+                KEY_HISTORY_REPEAT_INTERVAL_MILLIS,
+                HistoryRepeatInterval.clamp(intervalMillis),
+            )
             .apply()
     }
 
@@ -76,7 +102,8 @@ class EditorPreferences(context: Context) {
         private const val LEGACY_KEY_FONT_SIZE_SP = "font_size_sp"
         private const val KEY_LINE_SPACING = "line_spacing_multiplier"
         private const val KEY_WRAP_LINES = "wrap_lines"
-        private const val KEY_HISTORY_REPEAT_SPEED = "history_repeat_speed"
+        private const val KEY_HISTORY_REPEAT_INTERVAL_MILLIS = "history_repeat_interval_millis"
+        private const val KEY_LEGACY_HISTORY_REPEAT_SPEED = "history_repeat_speed"
 
         const val DEFAULT_FONT_SIZE_PT = 14f
         const val MIN_FONT_SIZE_PT = 8f
@@ -84,6 +111,5 @@ class EditorPreferences(context: Context) {
         const val DEFAULT_LINE_SPACING = 1f
         const val MIN_LINE_SPACING = 0.8f
         const val MAX_LINE_SPACING = 1.6f
-        val DEFAULT_HISTORY_REPEAT_SPEED = HistoryRepeatSpeed.DOUBLE
     }
 }
