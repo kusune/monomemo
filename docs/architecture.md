@@ -25,6 +25,10 @@ The toolbar undo and redo buttons also repeat their action while held, using
 the platform long-press threshold and a fixed 100 ms repeat interval. Repeating
 stops when the button is released or the corresponding history side is empty.
 
+`CursorAwareEditText` adds an `OverScroller`-based fling after a single-pointer
+scroll gesture. Selection drags and pinch gestures are excluded, so momentum
+does not interfere with text selection or font-size adjustment.
+
 The editor is local-first. There is no cloud or multi-provider abstraction yet;
 those should be introduced only when pCloud synchronization is implemented.
 

@@ -15,6 +15,7 @@ The current editor slice is intentionally small:
 - paste-at-cursor toolbar action
 - undo/redo for text edits, including branching after undo
 - long-press repeat for undo/redo toolbar actions
+- momentum scrolling for fast editor swipes
 - minimal menu and display settings entry points
 - software information in the main menu
 - local autosave after editing pauses

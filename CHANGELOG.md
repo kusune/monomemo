@@ -3,6 +3,7 @@
 ## 0.4.1
 
 - Repeat undo/redo while the corresponding toolbar button is held.
+- Add momentum to fast editor swipes.
 
 ## 0.4.0
 
