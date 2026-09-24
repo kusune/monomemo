@@ -22,12 +22,20 @@ discards the redo branch when a new edit is made after undo. The initial note
 loaded when the activity starts is therefore the first undo boundary for that
 session; the history is intentionally not persisted as part of the note file.
 The toolbar undo and redo buttons also repeat their action while held, using
-the platform long-press threshold and a fixed 100 ms repeat interval. Repeating
-stops when the button is released or the corresponding history side is empty.
+the platform long-press threshold. Repeating stops when the button is released
+or the corresponding history side is empty. The repeat speed can be selected
+in the settings dialog as 1x, 2x, or 4x; the default is 2x (50 ms between
+actions).
 
 `CursorAwareEditText` adds an `OverScroller`-based fling after a single-pointer
 scroll gesture. Selection drags and pinch gestures are excluded, so momentum
 does not interfere with text selection or font-size adjustment.
+
+The app requests the keyboard explicitly only at initial launch and does not
+force it visible after the user dismisses it. The keyboard's internal mode
+(such as a Japanese IME's kana/number toggle) belongs to the selected IME and
+is not exposed through a portable app API, so MonoMemo cannot reliably read or
+restore that submode.
 
 The editor is local-first. There is no cloud or multi-provider abstraction yet;
 those should be introduced only when pCloud synchronization is implemented.

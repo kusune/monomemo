@@ -8,6 +8,22 @@ data class DisplaySettings(
     val wrapLines: Boolean,
 )
 
+enum class HistoryRepeatSpeed(
+    val multiplier: Int,
+    val intervalMillis: Long,
+) {
+    NORMAL(1, 100L),
+    DOUBLE(2, 50L),
+    QUADRUPLE(4, 25L),
+    ;
+
+    companion object {
+        fun fromMultiplier(multiplier: Int): HistoryRepeatSpeed = values().firstOrNull {
+            it.multiplier == multiplier
+        } ?: EditorPreferences.DEFAULT_HISTORY_REPEAT_SPEED
+    }
+}
+
 /** App-level display preferences, kept separate from document contents. */
 class EditorPreferences(context: Context) {
     private val preferences = context.getSharedPreferences("editor-preferences", Context.MODE_PRIVATE)
@@ -24,6 +40,19 @@ class EditorPreferences(context: Context) {
             .putFloat(KEY_FONT_SIZE_PT, settings.fontSizePt)
             .putFloat(KEY_LINE_SPACING, settings.lineSpacingMultiplier)
             .putBoolean(KEY_WRAP_LINES, settings.wrapLines)
+            .apply()
+    }
+
+    fun loadHistoryRepeatSpeed(): HistoryRepeatSpeed = HistoryRepeatSpeed.fromMultiplier(
+        preferences.getInt(
+            KEY_HISTORY_REPEAT_SPEED,
+            DEFAULT_HISTORY_REPEAT_SPEED.multiplier,
+        ),
+    )
+
+    fun saveHistoryRepeatSpeed(speed: HistoryRepeatSpeed) {
+        preferences.edit()
+            .putInt(KEY_HISTORY_REPEAT_SPEED, speed.multiplier)
             .apply()
     }
 
@@ -47,6 +76,7 @@ class EditorPreferences(context: Context) {
         private const val LEGACY_KEY_FONT_SIZE_SP = "font_size_sp"
         private const val KEY_LINE_SPACING = "line_spacing_multiplier"
         private const val KEY_WRAP_LINES = "wrap_lines"
+        private const val KEY_HISTORY_REPEAT_SPEED = "history_repeat_speed"
 
         const val DEFAULT_FONT_SIZE_PT = 14f
         const val MIN_FONT_SIZE_PT = 8f
@@ -54,5 +84,6 @@ class EditorPreferences(context: Context) {
         const val DEFAULT_LINE_SPACING = 1f
         const val MIN_LINE_SPACING = 0.8f
         const val MAX_LINE_SPACING = 1.6f
+        val DEFAULT_HISTORY_REPEAT_SPEED = HistoryRepeatSpeed.DOUBLE
     }
 }

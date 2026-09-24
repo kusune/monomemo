@@ -54,6 +54,7 @@ class MainActivity : Activity() {
         lineSpacingMultiplier = EditorPreferences.DEFAULT_LINE_SPACING,
         wrapLines = false,
     )
+    private var historyRepeatSpeed = EditorPreferences.DEFAULT_HISTORY_REPEAT_SPEED
 
     private val saveRunnable = Runnable { saveNow() }
     private val historyRepeatRunnable = object : Runnable {
@@ -63,7 +64,7 @@ class MainActivity : Activity() {
                 stopHistoryRepeat()
                 return
             }
-            mainHandler.postDelayed(this, HISTORY_REPEAT_INTERVAL_MS)
+            mainHandler.postDelayed(this, historyRepeatSpeed.intervalMillis)
         }
     }
 
@@ -74,6 +75,7 @@ class MainActivity : Activity() {
         store = LocalNoteStore(this)
         editorPreferences = EditorPreferences(this)
         displaySettings = editorPreferences.load()
+        historyRepeatSpeed = editorPreferences.loadHistoryRepeatSpeed()
         scaleDetector = createScaleDetector()
         editor = createEditor()
 
@@ -101,8 +103,9 @@ class MainActivity : Activity() {
         window.statusBarColor = getColor(R.color.editor_background)
         window.navigationBarColor = Color.BLACK
         window.setSoftInputMode(
-            WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE or
-                WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE,
+            // showKeyboard() handles the initial launch. Do not force the IME
+            // visible again after the user dismisses it.
+            WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE,
         )
     }
 
@@ -177,8 +180,8 @@ class MainActivity : Activity() {
         wrapButton.setOnClickListener { toggleWrapLines() }
         addView(wrapButton)
 
-        val settingsButton = createActionButton(R.drawable.ic_settings, "表示設定")
-        settingsButton.setOnClickListener { showDisplaySettings() }
+        val settingsButton = createActionButton(R.drawable.ic_settings, "設定")
+        settingsButton.setOnClickListener { showSettings() }
         addView(settingsButton)
     }
 
@@ -264,8 +267,8 @@ class MainActivity : Activity() {
                     true
                 }
             }
-            menu.add("表示設定").setOnMenuItemClickListener {
-                showDisplaySettings()
+            menu.add("設定").setOnMenuItemClickListener {
+                showSettings()
                 true
             }
             menu.add(if (displaySettings.wrapLines) "折り返しを解除" else "折り返しを有効化")
@@ -281,9 +284,11 @@ class MainActivity : Activity() {
         }
     }
 
-    private fun showDisplaySettings() {
+    private fun showSettings() {
         val originalSettings = displaySettings
+        val originalHistoryRepeatSpeed = historyRepeatSpeed
         var draftSettings = originalSettings
+        var draftHistoryRepeatSpeed = originalHistoryRepeatSpeed
         var committed = false
 
         fun preview(settings: DisplaySettings) {
@@ -337,6 +342,25 @@ class MainActivity : Activity() {
         }
         lineSpacingLabel.text = "行間  %.0f%%".format(draftSettings.lineSpacingMultiplier * 100f)
 
+        val repeatSpeedLabel = TextView(this).apply {
+            setTextColor(Color.WHITE)
+        }
+        val repeatSpeedOptions = HistoryRepeatSpeed.values()
+        val repeatSpeedSeekBar = SeekBar(this).apply {
+            max = repeatSpeedOptions.lastIndex
+            progress = repeatSpeedOptions.indexOf(draftHistoryRepeatSpeed)
+            setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+                override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                    draftHistoryRepeatSpeed = repeatSpeedOptions[progress.coerceIn(0, max)]
+                    repeatSpeedLabel.text = repeatSpeedText(draftHistoryRepeatSpeed)
+                }
+
+                override fun onStartTrackingTouch(seekBar: SeekBar?) = Unit
+                override fun onStopTrackingTouch(seekBar: SeekBar?) = Unit
+            })
+        }
+        repeatSpeedLabel.text = repeatSpeedText(draftHistoryRepeatSpeed)
+
         val wrapSwitch = Switch(this).apply {
             text = "画面端で折り返す"
             setTextColor(Color.WHITE)
@@ -350,10 +374,12 @@ class MainActivity : Activity() {
         container.addView(fontSizeSeekBar)
         container.addView(lineSpacingLabel)
         container.addView(lineSpacingSeekBar)
+        container.addView(repeatSpeedLabel)
+        container.addView(repeatSpeedSeekBar)
         container.addView(wrapSwitch)
 
         val dialog = AlertDialog.Builder(this)
-            .setTitle("表示設定")
+            .setTitle("設定")
             .setView(container)
             .setNegativeButton("キャンセル", null)
             .setPositiveButton("決定", null)
@@ -362,7 +388,9 @@ class MainActivity : Activity() {
             dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
                 committed = true
                 displaySettings = draftSettings
+                historyRepeatSpeed = draftHistoryRepeatSpeed
                 editorPreferences.save(displaySettings)
+                editorPreferences.saveHistoryRepeatSpeed(historyRepeatSpeed)
                 applyDisplaySettings()
                 dialog.dismiss()
             }
@@ -370,6 +398,7 @@ class MainActivity : Activity() {
         dialog.setOnDismissListener {
             if (!committed) {
                 displaySettings = originalSettings
+                historyRepeatSpeed = originalHistoryRepeatSpeed
                 applyDisplaySettings()
             }
         }
@@ -448,13 +477,16 @@ class MainActivity : Activity() {
             stopHistoryRepeat()
             return
         }
-        mainHandler.postDelayed(historyRepeatRunnable, HISTORY_REPEAT_INTERVAL_MS)
+        mainHandler.postDelayed(historyRepeatRunnable, historyRepeatSpeed.intervalMillis)
     }
 
     private fun stopHistoryRepeat() {
         historyRepeatAction = null
         mainHandler.removeCallbacks(historyRepeatRunnable)
     }
+
+    private fun repeatSpeedText(speed: HistoryRepeatSpeed): String =
+        "Undo/Redo連続速度  ${speed.multiplier}倍（${speed.intervalMillis}ms間隔）"
 
     private fun currentEditorState(): EditorState = EditorState(
         text = editor.text.toString(),
@@ -612,6 +644,5 @@ class MainActivity : Activity() {
     companion object {
         private const val DISABLED_BUTTON_ALPHA = 0.35f
         private const val AUTOSAVE_DELAY_MS = 800L
-        private const val HISTORY_REPEAT_INTERVAL_MS = 100L
     }
 }

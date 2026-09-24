@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.4.2
+
+- Add configurable undo/redo long-press speed (1x, 2x, or 4x).
+- Avoid forcing the keyboard visible again after the user dismisses it.
+
 ## 0.4.1
 
 - Repeat undo/redo while the corresponding toolbar button is held.
