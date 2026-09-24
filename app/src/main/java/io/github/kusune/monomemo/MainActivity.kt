@@ -37,10 +37,16 @@ class MainActivity : Activity() {
     private lateinit var editor: CursorAwareEditText
     private lateinit var store: LocalNoteStore
     private lateinit var editorPreferences: EditorPreferences
+    private lateinit var undoButton: ImageButton
+    private lateinit var redoButton: ImageButton
     private lateinit var wrapButton: ImageButton
     private lateinit var scaleDetector: ScaleGestureDetector
+    private val editHistory = EditHistory()
 
     private var loading = true
+    private var historyApplying = false
+    private var pendingTextChange: PendingTextChange? = null
+    private var nextSelectionAfterTextChange: Selection? = null
     private var displaySettings = DisplaySettings(
         fontSizePt = EditorPreferences.DEFAULT_FONT_SIZE_PT,
         lineSpacingMultiplier = EditorPreferences.DEFAULT_LINE_SPACING,
@@ -62,7 +68,9 @@ class MainActivity : Activity() {
         setContentView(createScreen())
         applyDisplaySettings()
         restoreNote()
+        editHistory.clear()
         observeEditor()
+        updateHistoryButtons()
     }
 
     override fun onPause() {
@@ -143,6 +151,14 @@ class MainActivity : Activity() {
         pasteButton.setOnClickListener { pasteAtCursor() }
         addView(pasteButton)
 
+        undoButton = createActionButton(R.drawable.ic_undo, "元に戻す")
+        undoButton.setOnClickListener { undo() }
+        addView(undoButton)
+
+        redoButton = createActionButton(R.drawable.ic_redo, "やり直す")
+        redoButton.setOnClickListener { redo() }
+        addView(redoButton)
+
         wrapButton = createActionButton(R.drawable.ic_no_wrap, "折り返し切替")
         wrapButton.setOnClickListener { toggleWrapLines() }
         addView(wrapButton)
@@ -220,6 +236,20 @@ class MainActivity : Activity() {
 
     private fun showMainMenu(anchor: View) {
         PopupMenu(this, anchor).apply {
+            menu.add("元に戻す").apply {
+                isEnabled = editHistory.canUndo
+                setOnMenuItemClickListener {
+                    undo()
+                    true
+                }
+            }
+            menu.add("やり直す").apply {
+                isEnabled = editHistory.canRedo
+                setOnMenuItemClickListener {
+                    redo()
+                    true
+                }
+            }
             menu.add("表示設定").setOnMenuItemClickListener {
                 showDisplaySettings()
                 true
@@ -238,7 +268,16 @@ class MainActivity : Activity() {
     }
 
     private fun showDisplaySettings() {
-        var draftSettings = displaySettings
+        val originalSettings = displaySettings
+        var draftSettings = originalSettings
+        var committed = false
+
+        fun preview(settings: DisplaySettings) {
+            draftSettings = settings
+            displaySettings = settings
+            applyDisplaySettings()
+        }
+
         val container = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(24), dp(4), dp(24), 0)
@@ -252,9 +291,9 @@ class MainActivity : Activity() {
             progress = ((draftSettings.fontSizePt - EditorPreferences.MIN_FONT_SIZE_PT) * 2).roundToInt()
             setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
                 override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
-                    draftSettings = draftSettings.copy(
+                    preview(draftSettings.copy(
                         fontSizePt = EditorPreferences.MIN_FONT_SIZE_PT + progress / 2f,
-                    )
+                    ))
                     fontSizeLabel.text = "文字サイズ  %.1fpt".format(draftSettings.fontSizePt)
                 }
 
@@ -272,9 +311,9 @@ class MainActivity : Activity() {
             progress = ((draftSettings.lineSpacingMultiplier - EditorPreferences.MIN_LINE_SPACING) * 20).roundToInt()
             setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
                 override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
-                    draftSettings = draftSettings.copy(
+                    preview(draftSettings.copy(
                         lineSpacingMultiplier = EditorPreferences.MIN_LINE_SPACING + progress / 20f,
-                    )
+                    ))
                     lineSpacingLabel.text = "行間  %.0f%%".format(draftSettings.lineSpacingMultiplier * 100f)
                 }
 
@@ -289,7 +328,7 @@ class MainActivity : Activity() {
             setTextColor(Color.WHITE)
             isChecked = draftSettings.wrapLines
             setOnCheckedChangeListener { _, checked ->
-                draftSettings = draftSettings.copy(wrapLines = checked)
+                preview(draftSettings.copy(wrapLines = checked))
             }
         }
 
@@ -307,10 +346,17 @@ class MainActivity : Activity() {
             .create()
         dialog.setOnShowListener {
             dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                committed = true
                 displaySettings = draftSettings
                 editorPreferences.save(displaySettings)
                 applyDisplaySettings()
                 dialog.dismiss()
+            }
+        }
+        dialog.setOnDismissListener {
+            if (!committed) {
+                displaySettings = originalSettings
+                applyDisplaySettings()
             }
         }
         dialog.show()
@@ -339,10 +385,58 @@ class MainActivity : Activity() {
 
         // Use the caret's end position and do not replace a selected range.
         val insertionPoint = editor.selectionEnd.coerceIn(0, editor.text.length)
-        editor.text.insert(insertionPoint, pasted)
-        editor.setSelection(insertionPoint + pasted.length)
+        nextSelectionAfterTextChange = Selection(
+            start = insertionPoint + pasted.length,
+            end = insertionPoint + pasted.length,
+        )
+        try {
+            editor.text.insert(insertionPoint, pasted)
+            editor.setSelection(insertionPoint + pasted.length)
+        } finally {
+            nextSelectionAfterTextChange = null
+        }
         editor.requestFocus()
         scheduleSave()
+    }
+
+    private fun undo() {
+        val target = editHistory.undo(currentEditorState()) ?: return
+        applyHistoryState(target)
+    }
+
+    private fun redo() {
+        val target = editHistory.redo(currentEditorState()) ?: return
+        applyHistoryState(target)
+    }
+
+    private fun currentEditorState(): EditorState = EditorState(
+        text = editor.text.toString(),
+        selectionStart = editor.selectionStart,
+        selectionEnd = editor.selectionEnd,
+    ).normalized()
+
+    private fun applyHistoryState(state: EditorState) {
+        val scrollX = editor.scrollX
+        val scrollY = editor.scrollY
+        historyApplying = true
+        try {
+            val normalized = state.normalized()
+            editor.setText(normalized.text)
+            editor.setSelection(normalized.selectionStart, normalized.selectionEnd)
+        } finally {
+            historyApplying = false
+        }
+        editor.post { editor.scrollTo(scrollX, scrollY) }
+        updateHistoryButtons()
+        scheduleSave()
+    }
+
+    private fun updateHistoryButtons() {
+        if (!::undoButton.isInitialized || !::redoButton.isInitialized) return
+        undoButton.isEnabled = editHistory.canUndo
+        undoButton.alpha = if (editHistory.canUndo) 1f else DISABLED_BUTTON_ALPHA
+        redoButton.isEnabled = editHistory.canRedo
+        redoButton.alpha = if (editHistory.canRedo) 1f else DISABLED_BUTTON_ALPHA
     }
 
     private fun showSoftwareInfo() {
@@ -372,9 +466,54 @@ class MainActivity : Activity() {
 
     private fun observeEditor() {
         editor.addTextChangedListener(object : TextWatcher {
-            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
-            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) = scheduleSave()
-            override fun afterTextChanged(s: Editable?) = Unit
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {
+                pendingTextChange = null
+                if (loading || historyApplying) {
+                    return
+                }
+                val text = s ?: return
+                val safeStart = start.coerceIn(0, text.length)
+                val safeEnd = (safeStart + count).coerceAtMost(text.length)
+                pendingTextChange = PendingTextChange(
+                    start = safeStart,
+                    removedText = text.subSequence(safeStart, safeEnd).toString(),
+                    selectionBeforeStart = editor.selectionStart,
+                    selectionBeforeEnd = editor.selectionEnd,
+                )
+            }
+
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                if (loading || historyApplying) return
+                val change = pendingTextChange ?: return
+                val text = s ?: return
+                val safeStart = start.coerceIn(0, text.length)
+                val safeEnd = (safeStart + count).coerceAtMost(text.length)
+                pendingTextChange = change.copy(
+                    start = safeStart,
+                    insertedText = text.subSequence(safeStart, safeEnd).toString(),
+                )
+                scheduleSave()
+            }
+
+            override fun afterTextChanged(s: Editable?) {
+                val change = pendingTextChange ?: return
+                pendingTextChange = null
+                if (loading || historyApplying) return
+
+                val recorded = editHistory.record(
+                    TextEdit(
+                        start = change.start,
+                        removedText = change.removedText,
+                        insertedText = change.insertedText,
+                        selectionBeforeStart = change.selectionBeforeStart,
+                        selectionBeforeEnd = change.selectionBeforeEnd,
+                        selectionAfterStart = (nextSelectionAfterTextChange?.start ?: editor.selectionStart),
+                        selectionAfterEnd = (nextSelectionAfterTextChange?.end ?: editor.selectionEnd),
+                    ),
+                )
+                nextSelectionAfterTextChange = null
+                if (recorded) updateHistoryButtons()
+            }
         })
         editor.onEditorStateChanged = { if (!loading) scheduleSave() }
     }
@@ -410,7 +549,21 @@ class MainActivity : Activity() {
 
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
 
+    private data class PendingTextChange(
+        val start: Int,
+        val removedText: String,
+        val selectionBeforeStart: Int,
+        val selectionBeforeEnd: Int,
+        val insertedText: String = "",
+    )
+
+    private data class Selection(
+        val start: Int,
+        val end: Int,
+    )
+
     companion object {
+        private const val DISABLED_BUTTON_ALPHA = 0.35f
         private const val AUTOSAVE_DELAY_MS = 800L
     }
 }

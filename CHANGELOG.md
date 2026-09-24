@@ -4,6 +4,10 @@
 
 - Add an Android emulator smoke test that launches the main activity before a
   release is published.
+- Apply display-setting changes live while the settings dialog is open, with
+  `決定` to keep them and `キャンセル`/dismiss to restore the previous values.
+- Add a bounded undo/redo timeline for all text edits, including paste and
+  selection restoration. A new edit after undo starts a new branch.
 
 ## 0.1.0
 
